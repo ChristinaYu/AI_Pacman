@@ -1,8 +1,10 @@
 ************************************************************
 Project 1:	Search in Pacman README File
 Date:		02/04/2018 
-Author:		Christina Xuan Yu		xyu@unm.edu
+Author:		Christina Xuan Yu
 ************************************************************
+
+DFS, BFD, UCS, A star, corner problem, corner heuristics, food heuristics, suboptimal problem
 
 Question 1:
 
