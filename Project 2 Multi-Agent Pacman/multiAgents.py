@@ -14,6 +14,7 @@
 
 from util import manhattanDistance
 from game import Directions
+from game import Actions
 import random, util
 
 from game import Agent
@@ -79,41 +80,36 @@ class ReflexAgent(Agent):
         # print "newScaredTimes:\n",newScaredTimes[0]
 
         "*** YOUR CODE HERE ***" 
-        # distance to food
-        x, y = newPos
-        caplist = []
-        foodList = []
-        ghostList = []
         w1,w2,w3 = 10,100,10
         f1,f2,f3,closestCap = 0,0,0,0
+        x, y = newPos
+        caplist, foodList = [], []
         currentFood = currentGameState.getFood()
         capsuleList = currentGameState.getCapsules()
         
-        # f1: dist to food
+        # f1: DISTANCE TO THE NEAREST FOOD
         if currentFood[x][y] == True: f1 += 10
         for food in newFood.asList():
           foodList.append(manhattanDistance(newPos, food))
         closestfood = min(foodList) if len(foodList)>0 else 1
-        f1 += float(w1 / closestfood)
+        # The smaller the distance is, the higher f1 will be
+        f1 += w1 / closestfood
         
-        # f2: distance to ghost
-        if int(newScaredTimes[0])==0: sign = -1
+        # f2: DISTANCE TO THE NEAREST GHOST
+        if newScaredTimes[0]==0: sign = -1
         else: sign = 1
         for ghostPos in successorGameState.getGhostPositions():
           distToG = manhattanDistance(newPos, ghostPos)
-          ghostList.append(distToG)
-          if distToG <=1: 
-            f2 += 100*sign
-        f2 += w2/(min(ghostList)+1)
-        # print "f2: ",f2
+          # Add a heavy penalty if pacman is one step away from the nearest ghost
+          if distToG <=1: f2 += w2*sign
 
-        # f3: dist to cap
+        # f3: DISTANCE TO THE NEAREST CAPSULE
         for cap in capsuleList:
-          if (x,y) == cap: f1 += 10 
+          if newPos == cap: f1 += 10 
           caplist.append(manhattanDistance(newPos, cap))
           closestCap = min(caplist) if len(caplist)>0 else 1
-        if not newScaredTimes[0] == 0:
-          f3 += w3 / (closestCap+1)
+        # The smaller the distance is, the higher f3 will be
+        if newScaredTimes[0] > 0: f3 += w3 / (closestCap+1)
 
         return f1 + f2 + f3
 
@@ -171,9 +167,11 @@ class MinimaxAgent(MultiAgentSearchAgent):
         """ 
         "*** YOUR CODE HERE ***"
         scores = []
+        # loop through all legal actions
         for action in gameState.getLegalActions(0):
           state = gameState.generateSuccessor(0, action)
           scores.append((self.value(state,0,0),action))
+        # return the action with the highest score
         return max(scores, key = lambda x: x[0])[1]
 
     def value(self, state, agentID, depth):
@@ -181,20 +179,25 @@ class MinimaxAgent(MultiAgentSearchAgent):
         if agentID == state.getNumAgents(): 
           agentID = 0
           depth +=1
+        # if the state is a terminal state: return the state utility
         if state.isWin() or state.isLose() or depth == self.depth:
           return self.evaluationFunction(state)
+        # else: return maxValue(state,agentID,depth)/minValue(state,agentID,depth)
         return self.minmaxValue(state,agentID,depth)
 
     # combine maxValue() and minValue()
-    def minmaxValue(self, state,agentID, depth):
+    def minmaxValue(self, state, agentID, depth):
+        isPacmansTurn = 0
+        # if it's pacman's turn, initialize v = -inf. Else, initialize v = inf
         if agentID == 0 or agentID == state.getNumAgents():
+          isPacmansTurn = 1
           v = float('-inf')
         else: v = float('inf')
 
+        # for each successor of state: v = max/min(v, value(successor))
         for action in state.getLegalActions(agentID):
           s = state. generateSuccessor(agentID, action)
-          if agentID == 0 or agentID == state.getNumAgents():
-            v = max(v, self.value(s,agentID,depth))
+          if isPacmansTurn: v = max(v, self.value(s,agentID,depth))
           else: v = min(v, self.value(s,agentID,depth))
         return v
 
@@ -208,7 +211,52 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
           Returns the minimax action using self.depth and self.evaluationFunction
         """
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        scores = []
+        v, alpha, beta= float('-inf'), float('-inf'), float('inf')
+        # loop through all legal actions
+        for action in gameState.getLegalActions(0):
+          state = gameState.generateSuccessor(0, action)
+          v = max(v, self.value(state,0,0,alpha,beta))
+          if v > beta: return action
+          alpha = max(alpha, v)
+          scores.append((v,action))
+        # return the action with the highest score
+        return max(scores, key = lambda x: x[0])[1]
+
+    def value(self, state, agentID, depth, alpha, beta):
+        agentID += 1
+        if agentID == state.getNumAgents(): 
+          agentID = 0
+          depth +=1
+        # if the state is a terminal state: return the state utility
+        if state.isWin() or state.isLose() or depth == self.depth:
+          return self.evaluationFunction(state)
+        # else: return maxValue/minValue(state,agentID,depth,alpha,beta)
+        return self.minmaxValue(state,agentID,depth,alpha,beta)
+
+    # combine maxValue() and minValue()
+    def minmaxValue(self, state,agentID, depth, alpha, beta):
+        isPacmansTurn = 0
+        # if it's pacman's turn, initialize v = -inf. Else, initialize v = inf
+        if agentID == 0 or agentID == state.getNumAgents():
+          isPacmansTurn = 1
+          v = float('-inf')
+        else: v = float('inf')
+
+        # for each successor of state:
+        for action in state.getLegalActions(agentID):
+          s = state. generateSuccessor(agentID, action)
+
+          if isPacmansTurn:
+            v = max(v, self.value(s,agentID,depth,alpha,beta))
+            if v > beta: return v
+            alpha = max(alpha, v)
+            
+          else: 
+            v = min(v, self.value(s,agentID,depth,alpha,beta))
+            if v < alpha: return v
+            beta = min(beta, v)
+        return v
 
 class ExpectimaxAgent(MultiAgentSearchAgent):
     """
@@ -223,17 +271,121 @@ class ExpectimaxAgent(MultiAgentSearchAgent):
           legal moves.
         """
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        scores = []
+        # loop through all legal actions
+        for action in gameState.getLegalActions(0):
+          state = gameState.generateSuccessor(0, action)
+          scores.append((self.value(state,0,0),action))
+        # print "At ",gameState.getPacmanPosition()," scores in expectimax: \n",scores
+        # return the action with the highest score
+        return max(scores, key = lambda x: x[0])[1]
+
+    def value(self, state, agentID, depth):
+        agentID += 1
+        if agentID == state.getNumAgents(): 
+          agentID = 0
+          depth +=1
+        if state.isWin() or state.isLose() or depth == self.depth:
+          score = self.evaluationFunction(state)
+          # print "At ",state.getPacmanPosition()," scores in value: ",score
+          return score
+        return self.expectimaxValue(state,agentID,depth)
+
+    # combine maxValue() and expectValue()
+    def expectimaxValue(self, state,agentID, depth):
+        isPacmansTurn = 0
+        # if it's pacman's turn, initialize v = -inf. Else, initialize v = 0
+        if agentID == 0 or agentID == state.getNumAgents():
+          isPacmansTurn = 1
+          v = float('-inf')
+        else: v = 0
+
+        # for each successor of state:
+        actions = state.getLegalActions(agentID)
+        for action in actions:
+          s = state. generateSuccessor(agentID, action)
+          if isPacmansTurn: # v = max(v, value(successor))
+            v = max(v, self.value(s,agentID,depth))
+
+          else: # p = probability(successor); v += p * value(successor)
+            v += (1.0/float(len(actions))) * self.value(s,agentID,depth) 
+        return v
+
+def bfsGetSuccessors(state,walls):
+    "bfsGetSuccessor for bfs to get the successors of the given node, with the given walls situation"
+    # The implementation is the same as PositionSearchProblem.getSuccessors() from search.py in project1
+    successors = []
+    for action in [Directions.NORTH, Directions.SOUTH, Directions.EAST, Directions.WEST]:
+        x, y = state
+        dx, dy = Actions.directionToVector(action)
+        nextx, nexty = int(x + dx), int(y + dy)
+        if not walls[nextx][nexty]:
+            nextState = (nextx, nexty)
+            successors.append( ( nextState, action, 1) )
+    return successors
+
+def bfs(startPos, goalPos, walls):
+    "bfs returns the step costs estimation using breadth first search for the heuristics"
+    # The implementation of breadthFirstSearch is from search.py in project1
+    # It returns a int representing the length of the path from start to goal
+    from util import Queue
+    closed, fringe, start= set(), Queue(), (startPos,[])
+    fringe.push(start)
+    while fringe.isEmpty() == False:  
+        node,actions = fringe.pop()
+        if node == goalPos: return len(actions)
+        if node not in closed:
+            closed.add(node)
+            children = bfsGetSuccessors(node, walls)
+            for child,action,cost in children:
+                fringe.push( (child,actions+[action]) )
 
 def betterEvaluationFunction(currentGameState):
     """
       Your extreme ghost-hunting, pellet-nabbing, food-gobbling, unstoppable
       evaluation function (question 5).
 
-      DESCRIPTION: <write something here so we know what you did>
+      DESCRIPTION: The evaluationFunction is associated with:
+      the number of food left in the state; 
+      the total number of steps left to get to the terminating state(all food are eaten);
+      the distance between pacman and ghost during the scared time(or non-scared time);
+      the distance between pacman and the capsules
     """
     "*** YOUR CODE HERE ***"
-    util.raiseNotDefined()
+    w1,w2,w3 = 10,100,1
+    f1,f2,f3 = 0,0,0
+    closestCap, numStepsLeft = 0,0.0
+    caplist = []
+
+    capsuleList = currentGameState.getCapsules()
+    pacPos = currentGameState.getPacmanPosition()
+    currentFood = currentGameState.getFood()
+    newGhostStates = currentGameState.getGhostStates()
+    newScaredTimes = [ghostState.scaredTimer for ghostState in newGhostStates]
+
+    # f1: NUMBER OF FOOD LEFT & NUMBER OF STEPS LEFT TO EAT ALL FOOD DOTS
+    for food in currentFood.asList():
+      numStepsLeft += bfs(pacPos, food, currentGameState.getWalls())
+    f1 += (w1 / float(numStepsLeft+1))
+    f1 += (w1 / float(currentGameState.getNumFood()+1))
+    
+    # f2: DISTANCE TO THE GHOST DURING THE SCARED TIME OR NOT
+    # During scared time, pacman can go eat the ghost like a bonus capsule
+    if newScaredTimes[0]>0: 
+      capsuleList = [currentGameState.getGhostPosition(1)] + capsuleList
+    distToGh = manhattanDistance(pacPos, currentGameState.getGhostPosition(1))
+    # f2 += distToG/100.0 
+    # Add a heavy penalty to score if pacman is 1 step away from ghost
+    if newScaredTimes[0]==0 and distToGh <= 1: f2 += w2*(-1)
+
+    # f3: DISTANCE TO CAPSULES
+    for cap in capsuleList: 
+      caplist.append(manhattanDistance(pacPos, cap))
+    #   caplist.append(bfs(pacPos, cap, currentGameState.getWalls()))
+    closestCap = min(caplist) if len(caplist)>0 else 1
+    if newScaredTimes[0] > 0: f3 += (w3 / (float(closestCap)+1))
+  
+    return f1 + f2 + f3
 
 # Abbreviation
 better = betterEvaluationFunction
