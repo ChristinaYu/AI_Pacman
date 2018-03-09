@@ -10,6 +10,7 @@ Classic Pacman is modeled as both an adversarial and a stochastic search problem
 Project 3: Reinforcement Learning</br>
 </br>
 Implemented model-based and model-free reinforcement learning algorithms like Q Learning, applied to the AIMA textbook's Gridworld, Pacman, and a simulated crawling robot.</br>
-
+</br>
+More to come!
 
 
